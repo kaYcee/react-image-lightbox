@@ -35,7 +35,9 @@
   ],
   "license": "MIT",
   "jest": {
-    "setupFilesAfterEnv": ["./node_modules/jest-enzyme/lib/index.js"],
+    "setupFilesAfterEnv": [
+      "./node_modules/jest-enzyme/lib/index.js"
+    ],
     "setupFiles": [
       "./test-config/shim.js",
       "./test-config/test-setup.js"
@@ -58,6 +60,7 @@
     "> 1%"
   ],
   "dependencies": {
+    "exif-js": "^2.3.0",
     "prop-types": "^15.6.2",
     "react-modal": "^3.8.1"
   },

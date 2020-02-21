@@ -1,6 +1,7 @@
 import React, { Component } from 'react';
 import PropTypes from 'prop-types';
 import Modal from 'react-modal';
+import EXIF from 'exif-js';
 import {
   translate,
   getWindowWidth,
@@ -28,8 +29,17 @@ import {
 import './style.css';
 
 class ReactImageLightbox extends Component {
+  static isIOS () {
+    return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  };
+  
   static isTargetMatchImage(target) {
     return target && /ril-image-current/.test(target.className);
+  }
+  
+  static getSizeByOrientation (width, height, orientation) {
+    // 5-8 means oriented by 90 or 270 degrees
+    return orientation >= 5 && orientation <= 8 ? [height, width] : [width, height];
   }
 
   static parseMouseEvent(mouseEvent) {
@@ -60,10 +70,12 @@ class ReactImageLightbox extends Component {
   }
 
   // Request to transition to the previous image
-  static getTransform({ x = 0, y = 0, zoom = 1, width, targetWidth }) {
+  getTransform({ x = 0, y = 0, zoom = 1, width, targetWidth }) {
+    const { discourageDownloads } = this.props;
+    
     let nextX = x;
     const windowWidth = getWindowWidth();
-    if (width > windowWidth) {
+    if (width > windowWidth && !discourageDownloads) {
       nextX += (windowWidth - width) / 2;
     }
     const scaleFactor = zoom * (targetWidth / width);
@@ -1145,17 +1157,34 @@ class ReactImageLightbox extends Component {
     inMemoryImage.onload = () => {
       this.props.onImageLoad(imageSrc, srcType, inMemoryImage);
 
-      this.imageCache[imageSrc] = {
-        loaded: true,
-        width: inMemoryImage.width,
-        height: inMemoryImage.height,
-      };
+      const originWidth = inMemoryImage.width;
+      const originHeight = inMemoryImage.height;
+      
+      if (ReactImageLightbox.isIOS()) {
+        EXIF.getData(inMemoryImage, () => {
+          const orientation = EXIF.getTag(inMemoryImage, 'Orientation');
+          const [width, height] = ReactImageLightbox.getSizeByOrientation(originWidth, originHeight, orientation);
+          //console.log(orientation, width, height);
 
-      done();
+          this.saveImgCache(imageSrc, width, height);
+          done();
+        });
+      } else {
+        this.saveImgCache(imageSrc, originWidth, originHeight);
+        done();
+      }
     };
 
     inMemoryImage.src = imageSrc;
   }
+  
+  saveImgCache(imageSrc, width, height) {
+    this.imageCache[imageSrc] = {
+      loaded: true,
+      width,
+      height,
+    };
+  };
 
   // Load all images and their thumbnails
   loadAllImages(props = this.props) {
@@ -1315,7 +1344,7 @@ class ReactImageLightbox extends Component {
 
       const imageStyle = {
         ...transitionStyle,
-        ...ReactImageLightbox.getTransform({
+        ...this.getTransform({
           ...transforms,
           ...bestImageInfo,
         }),
